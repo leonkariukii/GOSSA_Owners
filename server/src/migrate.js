@@ -1,16 +1,24 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { loadConfig } from './config.js';
+import { runMigrations } from './migrations.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const migrationDir = path.resolve(__dirname, '../migrations');
+const direction = process.argv[2];
+const count = process.argv[3] ? Number(process.argv[3]) : undefined;
 
-const files = fs.readdirSync(migrationDir).filter((file) => file.endsWith('.sql')).sort();
-
-for (const file of files) {
-  const sql = fs.readFileSync(path.join(migrationDir, file), 'utf8');
-  console.log(`Prepared migration: ${file}`);
-  console.log(sql.slice(0, 120).replace(/\s+/g, ' '));
+if (!['up', 'down'].includes(direction) || (count !== undefined && !Number.isInteger(count))) {
+  console.error('Usage: node src/migrate.js <up|down> [count]');
+  process.exit(1);
 }
 
-console.log(`Applied ${files.length} migration(s).`);
+try {
+  const config = loadConfig();
+  const applied = await runMigrations({
+    databaseUrl: config.DATABASE_URL,
+    direction,
+    count,
+    log: (message) => console.log(message),
+  });
+  console.log(`Migration ${direction} complete: ${applied.length} migration(s) ${direction === 'up' ? 'applied' : 'reverted'}.`);
+} catch (error) {
+  console.error(`Migration ${direction} failed: ${error.message}`);
+  process.exit(1);
+}

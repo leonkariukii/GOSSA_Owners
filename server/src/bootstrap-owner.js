@@ -1,85 +1,108 @@
-import * as readline from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
-import { hash } from '@node-rs/argon2';
-import { ensureStore, saveStore } from './store.js';
+import readline from 'node:readline/promises';
+import { Writable } from 'node:stream';
+import { BootstrapError, bootstrapOwner } from './bootstrap.js';
+import { loadConfig } from './config.js';
+import { createPool } from './db.js';
 
-function envValue(name, fallback) {
+const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+
+function fromEnv(name) {
   const value = process.env[name];
-  return value && value.trim() ? value.trim() : fallback;
+  return value !== undefined && value.trim() !== '' ? value : undefined;
 }
 
-const rl = readline.createInterface({ input, output });
-
-async function readPrompt(label, fallback, isSecret = false) {
-  const answer = await rl.question(`${label}${fallback ? ` [${fallback}]` : ''}: `);
-  const value = answer.trim();
-  if (value) {
-    return value;
-  }
-
-  if (fallback) {
-    return fallback;
-  }
-
-  if (isSecret) {
-    console.error(`${label} is required.`);
-    process.exit(1);
-  }
-
-  return value;
-}
-
-async function main() {
-  const store = await ensureStore();
-
-  if (store.owner) {
-    console.log('Owner already exists; bootstrap skipped.');
+async function ask(label, fallback) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question(`${label}${fallback ? ` [${fallback}]` : ''}: `)).trim();
+    return answer || fallback;
+  } finally {
     rl.close();
-    return;
   }
-
-  const garageName = process.env.GOSSA_GARAGE_NAME?.trim() || await readPrompt('Garage name', 'Northside Garage');
-  const timeZone = process.env.GOSSA_GARAGE_TIMEZONE?.trim() || await readPrompt('Garage time zone', 'UTC');
-  const ownerName = process.env.GOSSA_OWNER_NAME?.trim() || await readPrompt('Owner name', 'Owner User');
-  const ownerEmail = (process.env.GOSSA_OWNER_EMAIL?.trim() || await readPrompt('Owner email', 'owner@example.com')).toLowerCase();
-  const password = process.env.GOSSA_OWNER_PASSWORD?.trim() || await readPrompt('Owner password', '', true);
-
-  const supportedZones = Intl.supportedValuesOf('timeZone');
-  if (timeZone !== 'UTC' && !supportedZones.includes(timeZone)) {
-    console.error('Invalid time_zone. Use a valid IANA time zone name.');
-    process.exit(1);
-  }
-
-  if (password.length < 12 || password.length > 128) {
-    console.error('Password must be 12-128 characters long.');
-    process.exit(1);
-  }
-
-  store.garage = {
-    ...store.garage,
-    name: garageName.trim(),
-    time_zone: timeZone,
-    updated_at: new Date().toISOString(),
-    version: (store.garage?.version ?? 1),
-  };
-
-  store.owner = {
-    id: `owner_${Date.now()}`,
-    garage_id: store.garage.id,
-    name: ownerName.trim(),
-    email: ownerEmail,
-    password_hash: await hash(password),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    version: 1,
-  };
-
-  await saveStore(store);
-  console.log(`Bootstrap complete. Garage "${garageName}" and owner "${ownerEmail}" are ready.`);
-  rl.close();
 }
 
-main().catch((error) => {
-  console.error('Bootstrap failed.', error);
-  process.exit(1);
-});
+/** Read a secret from the terminal without echoing it. */
+async function askSecret(label) {
+  const output = new Writable({
+    write(chunk, encoding, callback) {
+      if (!output.muted) {
+        process.stdout.write(chunk, encoding);
+      }
+      callback();
+    },
+  });
+  const rl = readline.createInterface({ input: process.stdin, output, terminal: true });
+  try {
+    process.stdout.write(`${label}: `);
+    output.muted = true;
+    return await rl.question('');
+  } finally {
+    output.muted = false;
+    rl.close();
+    process.stdout.write('\n');
+  }
+}
+
+async function collect() {
+  const values = {
+    garageName: fromEnv('GOSSA_GARAGE_NAME'),
+    timeZone: fromEnv('GOSSA_GARAGE_TIMEZONE'),
+    ownerName: fromEnv('GOSSA_OWNER_NAME'),
+    ownerEmail: fromEnv('GOSSA_OWNER_EMAIL'),
+    ownerPassword: process.env.GOSSA_OWNER_PASSWORD || undefined,
+  };
+
+  if (!interactive) {
+    const missing = [
+      ['GOSSA_GARAGE_NAME', values.garageName],
+      ['GOSSA_GARAGE_TIMEZONE', values.timeZone],
+      ['GOSSA_OWNER_NAME', values.ownerName],
+      ['GOSSA_OWNER_EMAIL', values.ownerEmail],
+      ['GOSSA_OWNER_PASSWORD', values.ownerPassword],
+    ].filter(([, value]) => value === undefined);
+    if (missing.length > 0) {
+      throw new BootstrapError(
+        `Not running in a terminal; set ${missing.map(([name]) => name).join(', ')} in the process environment.`,
+      );
+    }
+    return values;
+  }
+
+  values.garageName ??= await ask('Garage name', 'Northside Garage');
+  values.timeZone ??= await ask('Garage time zone (IANA)', 'UTC');
+  values.ownerName ??= await ask('Owner name');
+  values.ownerEmail ??= await ask('Owner email');
+  if (values.ownerPassword === undefined) {
+    const first = await askSecret('Owner password (12-128 characters)');
+    const second = await askSecret('Confirm owner password');
+    if (first !== second) {
+      throw new BootstrapError('Passwords do not match.');
+    }
+    values.ownerPassword = first;
+  }
+  return values;
+}
+
+let pool;
+try {
+  const config = loadConfig();
+  pool = createPool(config);
+
+  // If an owner already exists this is a no-op, so deployments can run it on every start.
+  const existing = await pool.query('SELECT 1 FROM owner_users LIMIT 1');
+  if (existing.rowCount > 0) {
+    console.log('Owner already exists; bootstrap skipped.');
+  } else {
+    const result = await bootstrapOwner(pool, await collect());
+    console.log(
+      result.created
+        ? `Bootstrap complete. Garage "${result.garageName}" and owner "${result.ownerEmail}" are ready.`
+        : 'Owner already exists; bootstrap skipped.',
+    );
+  }
+} catch (error) {
+  console.error(error instanceof BootstrapError ? error.message : `Bootstrap failed: ${error.message}`);
+  process.exitCode = 1;
+} finally {
+  await pool?.end();
+}

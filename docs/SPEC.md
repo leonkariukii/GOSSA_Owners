@@ -8,7 +8,7 @@
 
 GOSSA v1 lets a garage owner keep a mechanic roster, create and assign repair jobs, and track work through a small operational lifecycle. The application must use persistent storage. A frontend mockup, hard-coded dashboard, or browser-only store is not a completed implementation.
 
-The repository currently has a minimal React/Vite frontend at the repository root (`src/`, `index.html`) and does not yet implement the API, database, authentication, or product UI. Implement the server in a new root-level `server/` directory; do not move the existing frontend. See the root `AGENTS.md` for the pinned stack and coding-agent instructions.
+The repository has the React/Vite frontend at the repository root (`src/`, `index.html`) and the Express API, PostgreSQL migrations, authentication, and owner UI implemented against this specification. The server lives in the root-level `server/` directory; do not move the frontend. See the root `AGENTS.md` for the pinned stack and coding-agent instructions.
 
 ## 2. v1 scope
 
