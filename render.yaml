@@ -1,21 +1,32 @@
+# Single same-origin web service: Express serves the API and the built frontend (dist/).
+# Set GOSSA_OWNER_EMAIL and GOSSA_OWNER_PASSWORD as secrets in the Render dashboard;
+# they are only used by the idempotent bootstrap step and are ignored once an owner exists.
+databases:
+  - name: gossa-db
+    plan: basic-256mb
+    region: oregon
+
 services:
   - type: web
-    name: gossa-mvp-api
+    name: gossa
     runtime: node
     plan: starter
     region: oregon
-    rootDir: server
-    buildCommand: npm ci
-    startCommand: npm run bootstrap:owner && npm start
-    disk:
-      name: gossa-data
-      mountPath: /var/data
-      sizeGB: 1
+    buildCommand: npm ci && npm run build && npm --prefix server ci --omit=dev
+    startCommand: npm --prefix server run migrate:up && npm --prefix server run bootstrap:owner && npm --prefix server start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: GOSSA_DATA_DIR
-        value: /var/data
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gossa-db
+          property: connectionString
+      # Render terminates TLS at one reverse-proxy hop.
+      - key: TRUST_PROXY
+        value: "1"
       - key: GOSSA_GARAGE_NAME
         value: Northside Garage
       - key: GOSSA_GARAGE_TIMEZONE
