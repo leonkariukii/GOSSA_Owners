@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { loginErrorMessage } from '../lib/errors.js';
+import { errorMessage, loginErrorMessage } from '../lib/errors.js';
 import { login, sessionKey } from '../lib/services/auth.js';
 import Field from './Field.jsx';
 
-export default function SignIn() {
+export default function SignIn({ apiError, onRetry }) {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,6 +16,16 @@ export default function SignIn() {
   return (
     <div className="panel auth-panel">
       <h1>GOSSA owner sign in</h1>
+      {apiError ? (
+        <div className="notice notice-error" role="alert">
+          <p>Sign-in requires the server. {errorMessage(apiError)}</p>
+          {onRetry ? (
+            <button type="button" className="ghost" onClick={onRetry}>
+              Retry connection
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <form
         className="stack"
         onSubmit={(event) => {

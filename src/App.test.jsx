@@ -99,11 +99,24 @@ describe('GOSSA owner app', () => {
     expect(screen.getByLabelText(/password/i)).toHaveValue('');
   });
 
-  it('shows a recoverable error when the API is unreachable', async () => {
-    axios.request.mockRejectedValue(new Error('Network Error'));
+  it('shows the sign-in screen with a retry when the API is unreachable', async () => {
+    axios.request
+      .mockRejectedValueOnce(new Error('Network Error'))
+      .mockRejectedValueOnce(apiError(401, 'UNAUTHENTICATED', 'Authentication required.'));
     renderAt('#/');
-    expect(await screen.findByText('Could not reach GOSSA')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /gossa owner sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Sign-in requires the server.');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry connection' }));
+    await waitFor(() => expect(axios.request).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('shows the sign-in screen when the API proxy returns a server error', async () => {
+    axios.request.mockRejectedValue(apiError(502, 'UNKNOWN_ERROR', 'Bad Gateway.'));
+    renderAt('#/');
+    expect(await screen.findByRole('heading', { name: /gossa owner sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Sign-in requires the server.');
+    expect(screen.getByRole('button', { name: 'Retry connection' })).toBeInTheDocument();
   });
 
   it('signs in with a generic message on failure, then shows the dashboard', async () => {
