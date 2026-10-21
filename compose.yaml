@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: gossa
+      POSTGRES_USER: gossa
+      POSTGRES_PASSWORD: gossa_local_dev
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - gossa-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gossa -d gossa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  gossa-postgres-data:

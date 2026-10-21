@@ -45,6 +45,13 @@ createdb gossa
 export DATABASE_URL=postgres://postgres:postgres@localhost:5432/gossa
 ```
 
+On Windows, or if you prefer Docker for local PostgreSQL, use these PowerShell commands instead of the `createdb` and `export` commands above. The Compose database is for local development only and keeps its data in a Docker volume:
+
+```powershell
+docker compose up -d --wait db
+$env:DATABASE_URL = 'postgresql://gossa:gossa_local_dev@localhost:5433/gossa'
+```
+
 Apply migrations, then create the initial garage and owner:
 
 ```sh
@@ -66,7 +73,7 @@ On the sign-in screen, use the browser's password manager to save and autofill t
 
 ## Run locally
 
-In separate terminals from the repository root:
+Keep `DATABASE_URL` set in the API terminal, then start the API and frontend in separate terminals from the repository root:
 
 ```sh
 npm --prefix server run dev   # API on http://localhost:3000
@@ -77,16 +84,34 @@ Open <http://localhost:5173> and sign in with the owner you bootstrapped. The AP
 
 ## Production
 
-Build the frontend, then run the API with `NODE_ENV=production`. Express serves the built `dist/` after the API routes, so the app is same-origin and CORS stays disabled. Session cookies get the `Secure` flag in production, so serve over HTTPS. Behind a reverse proxy set `TRUST_PROXY` to the number of proxy hops so client IPs (used for login rate limiting) are correct.
+The production deployment uses two services:
+
+- **Vercel** builds and hosts the Vite frontend from the repository root. Use `npm run build` as the build command and `dist` as the output directory. The root `package.json` pins the build runtime to Node.js 24.
+- **Render** runs the Express API from `server/` and provides the PostgreSQL database. [render.yaml](./render.yaml) defines the API, database, migration pre-deploy command, owner bootstrap, and `/health` check.
+- **API routing** is same-origin from the browser: [vercel.json](./vercel.json) rewrites `/api/*` requests to `https://gossa-mvp-api.onrender.com/api/*`. Keep the Render service name/hostname in sync if it changes. The deleted `api/[...path].js` must remain absent so it cannot shadow this rewrite.
+
+### Deploy
+
+1. Push the repository to the Git provider connected to both services.
+2. In Render, create the Blueprint from `render.yaml`. The `starter` web-service plan is required because `preDeployCommand` runs migrations before deployment; the `starter` PostgreSQL plan provides persistent database storage. Wait for the database and API service to become healthy.
+3. In the Render API service environment, set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` as secrets. Use a unique password of 12–128 characters. Set these before the first API deploy so bootstrap can create the initial owner. `GOSSA_OWNER_NAME`, garage name, and time zone have non-secret defaults in the blueprint. Do not copy production database credentials into the repository or Vercel; Render injects `DATABASE_URL` from the managed database.
+4. In Vercel, import the same repository, use the repository root as the project root, and ensure the build command is `npm run build` with output directory `dist`. No frontend API URL or database secret is needed: the browser calls `/api/v1` and Vercel applies the rewrite.
+5. Once Vercel assigns a URL, open it and sign in using the owner credentials configured in Render. Configure a custom domain in Vercel only after the generated URL passes the checks below.
+
+Render migrations run with `preDeployCommand`, which requires a paid Render plan. For a free plan, move `npm run migrate:up &&` to the beginning of `startCommand`; this runs migrations at service startup instead and is less safe for deployments with multiple instances. Keep the API and database in the same region. The blueprint sets `TRUST_PROXY` to `2` for the Vercel-to-Render proxy chain; verify the observed client IP behavior after deployment and adjust this value if the request's `X-Forwarded-For` chain differs.
+
+### Verify the live deployment
+
+Replace the placeholders with the actual service and Vercel hostnames:
 
 ```sh
-npm run build
-npm --prefix server ci --omit=dev
-npm --prefix server run migrate:up
-npm --prefix server start
+curl -i https://<render-host>/health
+curl -i https://<vercel-host>/api/v1/auth/me
 ```
 
-[render.yaml](./render.yaml) describes a single Render web service plus a PostgreSQL database that runs these steps. Set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` as secrets in the dashboard. Configuration is validated at startup; missing required values stop the server rather than falling back to development defaults.
+The Render health check should return `200` and `{"ok":true}`. The unauthenticated Vercel API request should return `401` with a JSON error envelope and an `X-Request-Id` header, proving it reached Express through the rewrite. Then sign in through the Vercel URL: the browser should store the secure `session_id` cookie for the Vercel host, and `/api/v1/auth/me` should return `200`. Create a record, restart or redeploy the API, and confirm the record remains; application data must be stored in the managed PostgreSQL database, not local files.
+
+Render migrations are versioned and applied before a new service version starts. Keep the managed database's backup/retention settings enabled and rehearse a restore before relying on production data. Never add `DATABASE_URL`, owner credentials, or other secrets to Git; local `DATABASE_URL` files are ignored by [`.gitignore`](./.gitignore).
 
 ## Checks
 
@@ -129,7 +154,7 @@ The tenant-isolation tests create a second garage directly in that database; the
 
 - `npm --prefix server run reset:owner-password` (secure owner password reset with session revocation) is planned operational follow-up.
 - The hardening items in SPEC §11 (full accessibility audit, latency measurement, browser end-to-end tests, backup and restore rehearsal) have not been done or measured.
-- [vercel.json](./vercel.json) is a leftover from an earlier split deployment that proxied `/api` to a separate host. The supported deployment is a single same-origin Express service, so it can be removed unless you still deploy the frontend separately.
+- Automated browser end-to-end tests, measured latency, and a backup/restore rehearsal remain operational follow-up; complete these before relying on the deployment for critical business data.
 
 ## Scope
 
