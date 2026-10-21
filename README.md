@@ -54,6 +54,16 @@ npm --prefix server run bootstrap:owner
 
 `bootstrap:owner` is idempotent and never overwrites an existing owner. In a terminal it prompts for the garage name, IANA time zone, owner name and email, and a password (12–128 characters, entered without echo). Outside a terminal it reads `GOSSA_GARAGE_NAME`, `GOSSA_GARAGE_TIMEZONE`, `GOSSA_OWNER_NAME`, `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` from the process environment. It never prints the password, and there is no default password. Do not commit credentials.
 
+### Owner login details
+
+There are no default or shared login credentials. Sign in using the owner email and password supplied when the initial owner was created:
+
+- For local setup, `server/src/bootstrap-owner.js` reads the `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` environment variables, or securely prompts for them when run in a terminal. `server/.env.example` documents the variable names with placeholders only.
+- For Render, set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` in the service's environment settings as secrets. They are used only to create the first owner.
+- The email is stored in the PostgreSQL `owner_users` table. The password is Argon2id-hashed into `owner_users.password_hash`; the original password cannot be recovered from the database. Bootstrap does not overwrite an existing owner, so changing those environment variables later does not change the login.
+
+On the sign-in screen, use the browser's password manager to save and autofill the login on future visits. The Show password control can help check for typing mistakes. If the password has been lost, contact the deployment/database administrator; this project does not yet include a password-reset command.
+
 ## Run locally
 
 In separate terminals from the repository root:

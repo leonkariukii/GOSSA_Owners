@@ -139,11 +139,18 @@ describe('GOSSA owner app', () => {
 
     renderAt('#/');
     fireEvent.change(await screen.findByLabelText(/email/i), { target: { value: 'owner@example.com' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'wrong password!!' } });
+    const passwordField = screen.getByLabelText(/password/i);
+    expect(passwordField).toHaveAttribute('type', 'password');
+    fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(passwordField).toHaveAttribute('type', 'text');
+    fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(passwordField).toHaveAttribute('type', 'password');
+
+    fireEvent.change(passwordField, { target: { value: 'wrong password!!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByText('Incorrect email or password.')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'correct horse battery' } });
+    fireEvent.change(passwordField, { target: { value: 'correct horse battery' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
     expect(await screen.findByText('No jobs yet. Create the first job to get started.')).toBeInTheDocument();
