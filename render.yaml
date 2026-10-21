@@ -2,12 +2,11 @@ services:
   - type: web
     name: gossa-mvp-api
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     rootDir: server
     buildCommand: npm ci
-    preDeployCommand: npm run migrate:up
-    startCommand: npm run bootstrap:owner && npm start
+    startCommand: npm run migrate:up && npm run bootstrap:owner && npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -33,5 +32,5 @@ services:
 
 databases:
   - name: gossa-db
-    plan: starter
+    plan: free
     region: oregon

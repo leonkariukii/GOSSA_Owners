@@ -93,12 +93,12 @@ The production deployment uses two services:
 ### Deploy
 
 1. Push the repository to the Git provider connected to both services.
-2. In Render, create the Blueprint from `render.yaml`. The `starter` web-service plan is required because `preDeployCommand` runs migrations before deployment; the `starter` PostgreSQL plan provides persistent database storage. Wait for the database and API service to become healthy.
+2. In Render, create the Blueprint from `render.yaml`. This Blueprint uses the free web-service and PostgreSQL plans for a demo. Migrations run at service startup because free services do not support `preDeployCommand`. Wait for the database and API service to become healthy.
 3. In the Render API service environment, set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` as secrets. Use a unique password of 12–128 characters. Set these before the first API deploy so bootstrap can create the initial owner. `GOSSA_OWNER_NAME`, garage name, and time zone have non-secret defaults in the blueprint. Do not copy production database credentials into the repository or Vercel; Render injects `DATABASE_URL` from the managed database.
 4. In Vercel, import the same repository, use the repository root as the project root, and ensure the build command is `npm run build` with output directory `dist`. No frontend API URL or database secret is needed: the browser calls `/api/v1` and Vercel applies the rewrite.
 5. Once Vercel assigns a URL, open it and sign in using the owner credentials configured in Render. Configure a custom domain in Vercel only after the generated URL passes the checks below.
 
-Render migrations run with `preDeployCommand`, which requires a paid Render plan. For a free plan, move `npm run migrate:up &&` to the beginning of `startCommand`; this runs migrations at service startup instead and is less safe for deployments with multiple instances. Keep the API and database in the same region. The blueprint sets `TRUST_PROXY` to `2` for the Vercel-to-Render proxy chain; verify the observed client IP behavior after deployment and adjust this value if the request's `X-Forwarded-For` chain differs.
+**Free-plan data warning:** Render's free PostgreSQL database expires after 30 days and does not provide production-grade backup/retention guarantees; the free web service can also sleep when idle. This setup is for a demo only, not reliable long-term storage of customer or business records. Export the database before expiry if you need to preserve demo data. For production, upgrade the database and web service to suitable paid plans, then move migrations to `preDeployCommand`. Keep the API and database in the same region. The blueprint sets `TRUST_PROXY` to `2` for the Vercel-to-Render proxy chain; verify the observed client IP behavior after deployment and adjust this value if the request's `X-Forwarded-For` chain differs.
 
 ### Verify the live deployment
 
@@ -111,7 +111,7 @@ curl -i https://<vercel-host>/api/v1/auth/me
 
 The Render health check should return `200` and `{"ok":true}`. The unauthenticated Vercel API request should return `401` with a JSON error envelope and an `X-Request-Id` header, proving it reached Express through the rewrite. Then sign in through the Vercel URL: the browser should store the secure `session_id` cookie for the Vercel host, and `/api/v1/auth/me` should return `200`. Create a record, restart or redeploy the API, and confirm the record remains; application data must be stored in the managed PostgreSQL database, not local files.
 
-Render migrations are versioned and applied before a new service version starts. Keep the managed database's backup/retention settings enabled and rehearse a restore before relying on production data. Never add `DATABASE_URL`, owner credentials, or other secrets to Git; local `DATABASE_URL` files are ignored by [`.gitignore`](./.gitignore).
+Render migrations are versioned. In this free demo they are applied each time the service starts. Never add `DATABASE_URL`, owner credentials, or other secrets to Git; local `DATABASE_URL` files are ignored by [`.gitignore`](./.gitignore).
 
 ## Checks
 
