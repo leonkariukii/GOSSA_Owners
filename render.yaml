@@ -28,7 +28,7 @@ services:
       - key: GOSSA_OWNER_EMAIL
         sync: false
       - key: GOSSA_OWNER_PASSWORD
-        value: iloveJesus@2026
+        sync: false
 
 databases:
   - name: gossa-db
