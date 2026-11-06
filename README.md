@@ -88,7 +88,7 @@ The deployment uses Vercel for the Vite frontend and Render for two separate Exp
 
 [render.yaml](./render.yaml) defines both Render services and their separate PostgreSQL databases. Set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` as secrets for the protected API before its first deployment. The public demo runs with `PUBLIC_DEMO_MODE=true` and uses the isolated `gossa-demo-db` database, explicitly named `gossa_demo`; startup refuses public mode on any other database. The Blueprint wires its connection string automatically. The demo resets its database to fictional sample data on every service start. All demo edits are public and temporary. Do not configure `DATABASE_URL` in Vercel.
 
-The demo service uses Render's free web-service plan and may sleep when idle. The external database has its own provider's availability and retention limits; verify those before publishing the reviewer link.
+The demo service and database use Render's free plans, so the service may sleep when idle and the database may have provider availability or retention limits. Verify the current limits before relying on the demo for a review.
 
 After deploying the Render Blueprint and Vercel project, verify `https://gossa-mvp-demo.onrender.com/health` returns `200`, then open the Vercel URL. The dashboard should appear without a sign-in prompt and show the public-demo reset notice. Verify that creating a demo record works and that it returns to the sample dataset after restarting the demo service.
 
