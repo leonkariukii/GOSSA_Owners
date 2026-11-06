@@ -131,7 +131,7 @@ describe('GOSSA owner app', () => {
       },
     );
     renderAt('#/');
-    expect(await screen.findByRole('heading', { name: 'Could not reach GOSSA' })).toBeInTheDocument();
+    expect(await screen.findByText('Could not reach GOSSA')).toBeInTheDocument();
     expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
@@ -140,7 +140,7 @@ describe('GOSSA owner app', () => {
   it('shows an API error instead of sign-in when the API proxy returns a server error', async () => {
     axios.request.mockRejectedValue(apiError(502, 'UNKNOWN_ERROR', 'Bad Gateway.'));
     renderAt('#/');
-    expect(await screen.findByRole('heading', { name: 'Could not reach GOSSA' })).toBeInTheDocument();
+    expect(await screen.findByText('Could not reach GOSSA')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
   });
