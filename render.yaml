@@ -45,7 +45,9 @@ services:
       - key: NODE_VERSION
         value: "24"
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: gossa-demo-db
+          property: connectionString
       - key: PUBLIC_DEMO_MODE
         value: "true"
       - key: TRUST_PROXY
@@ -53,5 +55,9 @@ services:
 
 databases:
   - name: gossa-db
+    plan: free
+    region: oregon
+  - name: gossa-demo-db
+    databaseName: gossa_demo
     plan: free
     region: oregon
