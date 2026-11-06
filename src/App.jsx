@@ -17,9 +17,6 @@ function AuthGate() {
         </div>
       );
     }
-    if (session.error?.isNetwork || session.error?.status >= 500) {
-      return <SignIn apiError={session.error} onRetry={() => session.refetch()} />;
-    }
     return (
       <div className="page-shell">
         <ErrorState

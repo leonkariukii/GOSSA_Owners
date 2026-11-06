@@ -118,24 +118,31 @@ describe('GOSSA owner app', () => {
     expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
   });
 
-  it('shows the sign-in screen with a retry when the API is unreachable', async () => {
-    axios.request
-      .mockRejectedValueOnce(new Error('Network Error'))
-      .mockRejectedValueOnce(apiError(401, 'UNAUTHENTICATED', 'Authentication required.'));
+  it('shows an API error instead of sign-in when the API is unreachable, then opens the public demo after retry', async () => {
+    axios.request.mockRejectedValueOnce(new Error('Network Error'));
+    fakeApi(
+      {
+        'GET /dashboard': () =>
+          ok({ data: { open_count: 0, in_progress_count: 0, waiting_count: 0, completed_today_count: 0, recent_jobs: [] } }),
+      },
+      {
+        ...session,
+        user: { ...session.user, name: 'Demo User', email: 'demo-owner@example.invalid', role: 'demo' },
+      },
+    );
     renderAt('#/');
-    expect(await screen.findByRole('heading', { name: /gossa owner sign in/i })).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('Sign-in requires the server.');
-    fireEvent.click(screen.getByRole('button', { name: 'Retry connection' }));
-    await waitFor(() => expect(axios.request).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(await screen.findByRole('heading', { name: 'Could not reach GOSSA' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   });
 
-  it('shows the sign-in screen when the API proxy returns a server error', async () => {
+  it('shows an API error instead of sign-in when the API proxy returns a server error', async () => {
     axios.request.mockRejectedValue(apiError(502, 'UNKNOWN_ERROR', 'Bad Gateway.'));
     renderAt('#/');
-    expect(await screen.findByRole('heading', { name: /gossa owner sign in/i })).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('Sign-in requires the server.');
-    expect(screen.getByRole('button', { name: 'Retry connection' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Could not reach GOSSA' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
   });
 
   it('signs in with a generic message on failure, then shows the dashboard', async () => {
