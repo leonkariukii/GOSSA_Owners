@@ -84,44 +84,13 @@ Open <http://localhost:5173> and sign in with the owner you bootstrapped. The AP
 
 ## Production
 
-<<<<<<< HEAD
-The deployment uses Vercel for the Vite frontend and Render for two separate Express APIs and PostgreSQL databases. Vercel builds from the repository root with `npm run build` and publishes `dist`. [vercel.json](./vercel.json) routes `/api/*` to the public demo API at `https://gossa-mvp-demo.onrender.com`. The existing `gossa-mvp-api` API and `gossa-db` remain sign-in protected and are not used by the public Vercel app.
+The deployment uses Vercel for the Vite frontend and Render for two separate Express APIs. Vercel builds from the repository root with `npm run build` and publishes `dist`. [vercel.json](./vercel.json) routes `/api/*` to the public demo API at `https://gossa-mvp-demo.onrender.com`. The existing `gossa-mvp-api` API and `gossa-db` remain sign-in protected and are not used by the public Vercel app.
 
-[render.yaml](./render.yaml) defines both Render services. Set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` as secrets for the protected API before its first deployment. The public demo runs with `PUBLIC_DEMO_MODE=true` against a separate database whose name must be `gossa_demo`; startup refuses public mode on any other database. It resets that database to fictional sample data on every service start. All demo edits are public and temporary. Do not configure `DATABASE_URL` in Vercel; Render supplies each API's database connection.
+[render.yaml](./render.yaml) defines both Render services. Set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` as secrets for the protected API before its first deployment. The public demo runs with `PUBLIC_DEMO_MODE=true` and requires a separate PostgreSQL database named `gossa_demo`; startup refuses public mode on any other database. Add that external database's connection string as the demo service's `DATABASE_URL` secret in Render. The demo resets its database to fictional sample data on every service start. All demo edits are public and temporary. Do not configure `DATABASE_URL` in Vercel.
 
-The demo service and database use Render's free plans, which may sleep and whose free database expires after 30 days. Upgrade those resources if the reviewer link needs to remain continuously available beyond that period.
+The demo service uses Render's free web-service plan and may sleep when idle. The external database has its own provider's availability and retention limits; verify those before publishing the reviewer link.
 
 After deploying the Render Blueprint and Vercel project, verify `https://gossa-mvp-demo.onrender.com/health` returns `200`, then open the Vercel URL. The dashboard should appear without a sign-in prompt and show the public-demo reset notice. Verify that creating a demo record works and that it returns to the sample dataset after restarting the demo service.
-=======
-The production deployment uses two services:
-
-- **Vercel** builds and hosts the Vite frontend from the repository root. Use `npm run build` as the build command and `dist` as the output directory. The root `package.json` pins the build runtime to Node.js 24.
-- **Render** runs the Express API from `server/` and provides the PostgreSQL database. [render.yaml](./render.yaml) defines the API, database, migration pre-deploy command, owner bootstrap, and `/health` check.
-- **API routing** is same-origin from the browser: [vercel.json](./vercel.json) rewrites `/api/*` requests to `https://gossa-mvp-api.onrender.com/api/*`. Keep the Render service name/hostname in sync if it changes. The deleted `api/[...path].js` must remain absent so it cannot shadow this rewrite.
-
-### Deploy
-
-1. Push the repository to the Git provider connected to both services.
-2. In Render, create the Blueprint from `render.yaml`. This Blueprint uses the free web-service and PostgreSQL plans for a demo. Migrations run at service startup because free services do not support `preDeployCommand`. Wait for the database and API service to become healthy.
-3. In the Render API service environment, set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` as secrets. Use a unique password of 12–128 characters. Set these before the first API deploy so bootstrap can create the initial owner. `GOSSA_OWNER_NAME`, garage name, and time zone have non-secret defaults in the blueprint. Do not copy production database credentials into the repository or Vercel; Render injects `DATABASE_URL` from the managed database.
-4. In Vercel, import the same repository, use the repository root as the project root, and ensure the build command is `npm run build` with output directory `dist`. No frontend API URL or database secret is needed: the browser calls `/api/v1` and Vercel applies the rewrite.
-5. Once Vercel assigns a URL, open it and sign in using the owner credentials configured in Render. Configure a custom domain in Vercel only after the generated URL passes the checks below.
-
-**Free-plan data warning:** Render's free PostgreSQL database expires after 30 days and does not provide production-grade backup/retention guarantees; the free web service can also sleep when idle. This setup is for a demo only, not reliable long-term storage of customer or business records. Export the database before expiry if you need to preserve demo data. For production, upgrade the database and web service to suitable paid plans, then move migrations to `preDeployCommand`. Keep the API and database in the same region. The blueprint sets `TRUST_PROXY` to `2` for the Vercel-to-Render proxy chain; verify the observed client IP behavior after deployment and adjust this value if the request's `X-Forwarded-For` chain differs.
-
-### Verify the live deployment
-
-Replace the placeholders with the actual service and Vercel hostnames:
-
-```sh
-curl -i https://<render-host>/health
-curl -i https://<vercel-host>/api/v1/auth/me
-```
-
-The Render health check should return `200` and `{"ok":true}`. The unauthenticated Vercel API request should return `401` with a JSON error envelope and an `X-Request-Id` header, proving it reached Express through the rewrite. Then sign in through the Vercel URL: the browser should store the secure `session_id` cookie for the Vercel host, and `/api/v1/auth/me` should return `200`. Create a record, restart or redeploy the API, and confirm the record remains; application data must be stored in the managed PostgreSQL database, not local files.
-
-Render migrations are versioned. In this free demo they are applied each time the service starts. Never add `DATABASE_URL`, owner credentials, or other secrets to Git; local `DATABASE_URL` files are ignored by [`.gitignore`](./.gitignore).
->>>>>>> 42a1427512bb6a624977331047e017792dabbe43
 
 ## Checks
 
@@ -165,10 +134,7 @@ The tenant-isolation tests create a second garage directly in that database; the
 
 - `npm --prefix server run reset:owner-password` (secure owner password reset with session revocation) is planned operational follow-up.
 - The hardening items in SPEC §11 (full accessibility audit, latency measurement, browser end-to-end tests, backup and restore rehearsal) have not been done or measured.
-<<<<<<< HEAD
-=======
 - Automated browser end-to-end tests, measured latency, and a backup/restore rehearsal remain operational follow-up; complete these before relying on the deployment for critical business data.
->>>>>>> 42a1427512bb6a624977331047e017792dabbe43
 
 ## Scope
 
