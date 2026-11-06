@@ -66,7 +66,9 @@ export default function Shell({ session }) {
           <div>
             <strong>{session.garage.name}</strong>
             <small>
-              {session.user.name} &middot; {session.user.email}
+              {session.user.role === 'demo'
+                ? 'Public demo · changes reset when the server restarts'
+                : `${session.user.name} · ${session.user.email}`}
             </small>
           </div>
           <nav aria-label="Main">
@@ -83,16 +85,18 @@ export default function Shell({ session }) {
               })}
             </ul>
           </nav>
-          <div>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              {logoutMutation.isPending ? 'Signing out…' : 'Sign out'}
-            </button>
-          </div>
+          {session.user.role !== 'demo' ? (
+            <div>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+              >
+                {logoutMutation.isPending ? 'Signing out…' : 'Sign out'}
+              </button>
+            </div>
+          ) : null}
         </header>
         {logoutMutation.error ? (
           <p className="notice notice-error" role="alert">

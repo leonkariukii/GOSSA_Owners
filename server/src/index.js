@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
+import { assertPublicDemoDatabase } from './demo.js';
 import { createLogger } from './logger.js';
 
 let config;
@@ -22,6 +23,16 @@ try {
 } catch (error) {
   logger.error('Cannot connect to PostgreSQL. Check DATABASE_URL and run migrations.', { error: error.message });
   process.exit(1);
+}
+
+if (config.PUBLIC_DEMO_MODE) {
+  try {
+    await assertPublicDemoDatabase(pool);
+  } catch (error) {
+    logger.error('Public demo mode requires the isolated gossa_demo database.', { error: error.message });
+    await pool.end();
+    process.exit(1);
+  }
 }
 
 // In production Express serves the built frontend (repository-root dist/) from the same origin.

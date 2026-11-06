@@ -67,16 +67,13 @@ Open <http://localhost:5173> and sign in with the owner you bootstrapped. The AP
 
 ## Production
 
-Build the frontend, then run the API with `NODE_ENV=production`. Express serves the built `dist/` after the API routes, so the app is same-origin and CORS stays disabled. Session cookies get the `Secure` flag in production, so serve over HTTPS. Behind a reverse proxy set `TRUST_PROXY` to the number of proxy hops so client IPs (used for login rate limiting) are correct.
+The deployment uses Vercel for the Vite frontend and Render for two separate Express APIs and PostgreSQL databases. Vercel builds from the repository root with `npm run build` and publishes `dist`. [vercel.json](./vercel.json) routes `/api/*` to the public demo API at `https://gossa-mvp-demo.onrender.com`. The existing `gossa-mvp-api` API and `gossa-db` remain sign-in protected and are not used by the public Vercel app.
 
-```sh
-npm run build
-npm --prefix server ci --omit=dev
-npm --prefix server run migrate:up
-npm --prefix server start
-```
+[render.yaml](./render.yaml) defines both Render services. Set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` as secrets for the protected API before its first deployment. The public demo runs with `PUBLIC_DEMO_MODE=true` against a separate database whose name must be `gossa_demo`; startup refuses public mode on any other database. It resets that database to fictional sample data on every service start. All demo edits are public and temporary. Do not configure `DATABASE_URL` in Vercel; Render supplies each API's database connection.
 
-[render.yaml](./render.yaml) describes a single Render web service plus a PostgreSQL database that runs these steps. Set `GOSSA_OWNER_EMAIL` and `GOSSA_OWNER_PASSWORD` as secrets in the dashboard. Configuration is validated at startup; missing required values stop the server rather than falling back to development defaults.
+The demo service and database use Render's free plans, which may sleep and whose free database expires after 30 days. Upgrade those resources if the reviewer link needs to remain continuously available beyond that period.
+
+After deploying the Render Blueprint and Vercel project, verify `https://gossa-mvp-demo.onrender.com/health` returns `200`, then open the Vercel URL. The dashboard should appear without a sign-in prompt and show the public-demo reset notice. Verify that creating a demo record works and that it returns to the sample dataset after restarting the demo service.
 
 ## Checks
 
@@ -109,7 +106,8 @@ The tenant-isolation tests create a second garage directly in that database; the
 │   ├── src/                # Express app: routes, services, repos (SQL), validation, http middleware
 │   └── test/               # Vitest + Supertest API and database tests
 ├── docs/SPEC.md            # Product scope, domain rules, and API contract
-├── render.yaml             # Render deployment (web service + PostgreSQL)
+├── render.yaml             # Protected and public-demo Render APIs + databases
+├── vercel.json             # Vercel build, output, and public-demo API rewrite
 ├── index.html
 ├── package.json            # Frontend scripts and dependencies
 └── vite.config.js
@@ -119,7 +117,6 @@ The tenant-isolation tests create a second garage directly in that database; the
 
 - `npm --prefix server run reset:owner-password` (secure owner password reset with session revocation) is planned operational follow-up.
 - The hardening items in SPEC §11 (full accessibility audit, latency measurement, browser end-to-end tests, backup and restore rehearsal) have not been done or measured.
-- [vercel.json](./vercel.json) is a leftover from an earlier split deployment that proxied `/api` to a separate host. The supported deployment is a single same-origin Express service, so it can be removed unless you still deploy the frontend separately.
 
 ## Scope
 

@@ -181,6 +181,24 @@ describe('session lifecycle', () => {
   });
 });
 
+describe('public demo access', () => {
+  it('serves the demo without sign-in or CSRF and rejects login routes', async () => {
+    const demo = createTestContext({ PUBLIC_DEMO_MODE: 'true' });
+    try {
+      const visitor = request(demo.app);
+      const identity = await visitor.get('/api/v1/auth/me').expect(200);
+      expect(identity.body.data.user.role).toBe('demo');
+      expect(identity.body.data.garage.name).toBe('Northside Garage');
+
+      await visitor.get('/api/v1/dashboard').expect(200);
+      await visitor.post('/api/v1/mechanics').send({ name: 'Visitor Mechanic' }).expect(201);
+      await visitor.post('/api/v1/auth/login').send({ email: 'owner@example.com', password: OWNER_PASSWORD }).expect(404);
+    } finally {
+      await demo.pool.end();
+    }
+  });
+});
+
 describe('garage settings', () => {
   it('reads the garage with an ETag and updates it under If-Match', async () => {
     const owner = await login(ctx.app);

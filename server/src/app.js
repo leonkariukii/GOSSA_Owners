@@ -4,7 +4,7 @@ import express from 'express';
 import { authenticate, requireCsrf } from './http/auth.js';
 import { createFailureLimiter } from './http/rate-limit.js';
 import { errorHandler, noStore, notFoundHandler, requestContext, securityHeaders } from './http/request.js';
-import { createPublicAuthRouter, createSessionRouter } from './routes/auth.js';
+import { createPublicAuthRouter, createPublicDemoRouter, createSessionRouter } from './routes/auth.js';
 import { createDashboardRouter } from './routes/dashboard.js';
 import { createGarageRouter } from './routes/garage.js';
 import { createJobsRouter } from './routes/jobs.js';
@@ -42,12 +42,17 @@ export function createApp({ config, pool, logger, staticDir = null }) {
   const api = express.Router();
   api.use(noStore);
   api.use(express.json({ limit: '100kb' }));
-  api.use(createPublicAuthRouter({ pool, config, limiter }));
 
-  // Everything below requires the owner session; state-changing requests also need CSRF.
-  api.use(authenticate({ pool }));
-  api.use(requireCsrf);
-  api.use(createSessionRouter({ pool, config }));
+  if (config.PUBLIC_DEMO_MODE) {
+    api.use(createPublicDemoRouter({ pool }));
+  } else {
+    api.use(createPublicAuthRouter({ pool, config, limiter }));
+
+    // Everything below requires the owner session; state-changing requests also need CSRF.
+    api.use(authenticate({ pool }));
+    api.use(requireCsrf);
+    api.use(createSessionRouter({ pool, config }));
+  }
   api.use(createGarageRouter({ pool }));
   api.use(createDashboardRouter({ pool }));
   api.use(createMechanicsRouter({ pool }));

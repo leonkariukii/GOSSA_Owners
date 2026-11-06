@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import argon2 from 'argon2';
-import { rateLimited, unauthenticated } from '../errors.js';
+import { AppError, rateLimited, unauthenticated } from '../errors.js';
 import { findOwnerByEmail } from '../repos/owners.js';
 import { deleteStaleSessions, insertSession, revokeSession } from '../repos/sessions.js';
 import { SESSION_COOKIE, hashToken, randomToken, sessionCookieOptions } from '../http/auth.js';
@@ -25,10 +25,56 @@ async function verifyPassword(hash, password) {
 
 function sessionPayload({ user, garage, csrfToken }) {
   return {
-    user: { id: user.id, email: user.email, name: user.name, role: 'owner' },
+    user: { id: user.id, email: user.email, name: user.name, role: user.role ?? 'owner' },
     garage: { id: garage.id, name: garage.name, time_zone: garage.time_zone },
     csrf_token: csrfToken,
   };
+}
+
+/** Public access is enabled only on the isolated, disposable demo deployment. */
+export function createPublicDemoRouter({ pool }) {
+  const router = express.Router();
+
+  router.use(async (req, res, next) => {
+    const { rows } = await pool.query(
+      `SELECT u.id AS user_id, u.name AS user_name, u.email, u.garage_id,
+              g.name AS garage_name, g.time_zone, g.version AS garage_version
+       FROM owner_users u
+       JOIN garages g ON g.id = u.garage_id
+       ORDER BY u.id
+       LIMIT 1`,
+    );
+    const demo = rows[0];
+    if (!demo) {
+      throw new AppError(503, 'DEMO_NOT_READY', 'The public demo has not been initialized.');
+    }
+
+    req.auth = {
+      session: { id: null, csrfToken: 'public-demo' },
+      user: { id: demo.user_id, name: demo.user_name, email: demo.email, role: 'demo' },
+      garageId: demo.garage_id,
+      garage: {
+        id: demo.garage_id,
+        name: demo.garage_name,
+        timeZone: demo.time_zone,
+        version: demo.garage_version,
+      },
+    };
+    next();
+  });
+
+  router.get('/auth/me', (req, res) => {
+    const { user, garage, session } = req.auth;
+    res.json({
+      data: sessionPayload({
+        user,
+        garage: { id: garage.id, name: garage.name, time_zone: garage.timeZone },
+        csrfToken: session.csrfToken,
+      }),
+    });
+  });
+
+  return router;
 }
 
 /** Routes that must work without a session. */

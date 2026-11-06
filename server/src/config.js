@@ -4,6 +4,7 @@ const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   DATABASE_URL: z.string().min(1),
+  PUBLIC_DEMO_MODE: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   // Number of reverse-proxy hops to trust for req.ip (0 = none).
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
   DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),

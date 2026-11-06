@@ -61,13 +61,13 @@ function apiError(status, code, message, details) {
 }
 
 /** Install a fake API. `handlers` maps "METHOD /path" to (config) => response (or throws). */
-function fakeApi(handlers) {
+function fakeApi(handlers, sessionData = session) {
   const calls = [];
   axios.request.mockImplementation(async (config) => {
     const method = (config.method ?? 'get').toUpperCase();
     const path = config.url.replace('/api/v1', '');
     calls.push({ method, path, ...config });
-    if (method === 'GET' && path === '/auth/me') return ok({ data: session });
+    if (method === 'GET' && path === '/auth/me') return ok({ data: sessionData });
     const handler = handlers[`${method} ${path}`];
     if (!handler) return ok({ data: {} });
     return handler(config);
@@ -97,6 +97,25 @@ describe('GOSSA owner app', () => {
     expect(await screen.findByRole('heading', { name: /gossa owner sign in/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toHaveValue('');
     expect(screen.getByLabelText(/password/i)).toHaveValue('');
+  });
+
+  it('opens the public demo directly and explains its reset behavior', async () => {
+    fakeApi(
+      {
+        'GET /dashboard': () =>
+          ok({ data: { open_count: 0, in_progress_count: 0, waiting_count: 0, completed_today_count: 0, recent_jobs: [] } }),
+      },
+      {
+        ...session,
+        user: { ...session.user, name: 'Demo User', email: 'demo-owner@example.invalid', role: 'demo' },
+      },
+    );
+
+    renderAt('#/');
+
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByText('Public demo · changes reset when the server restarts')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
   });
 
   it('shows the sign-in screen with a retry when the API is unreachable', async () => {
