@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .env
+DATABASE_URL
 server/data/
 
 # Editor directories and files

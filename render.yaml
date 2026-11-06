@@ -30,6 +30,7 @@ services:
       - key: GOSSA_OWNER_PASSWORD
         sync: false
 
+<<<<<<< HEAD
   - type: web
     name: gossa-mvp-demo
     runtime: node
@@ -53,11 +54,16 @@ services:
       - key: TRUST_PROXY
         value: "2"
 
+=======
+>>>>>>> 42a1427512bb6a624977331047e017792dabbe43
 databases:
   - name: gossa-db
     plan: free
     region: oregon
+<<<<<<< HEAD
   - name: gossa-demo-db
     databaseName: gossa_demo
     plan: free
     region: oregon
+=======
+>>>>>>> 42a1427512bb6a624977331047e017792dabbe43

@@ -227,6 +227,16 @@ main > section {
   margin: 4rem auto;
 }
 
+.password-field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.password-toggle {
+  justify-self: end;
+  padding: 0.25rem 0.5rem;
+}
+
 /* Forms */
 .field-grid {
   display: grid;
